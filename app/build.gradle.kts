@@ -33,6 +33,11 @@ android {
     kotlinOptions {
         jvmTarget = "1.8"
     }
+    buildFeatures {
+        viewBinding = true
+    }
+
+
 }
 
 dependencies {
@@ -41,11 +46,23 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("com.google.android.material:material:1.11.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+    // ml kit
+    implementation ("com.google.mlkit:pose-detection-accurate:18.0.0-beta4")
+    implementation ("com.google.mlkit:pose-detection:18.0.0-beta4")
+
+    implementation ("androidx.appcompat:appcompat:1.6.1")
+    implementation ("androidx.annotation:annotation:1.7.1")
+    implementation ("androidx.constraintlayout:constraintlayout:2.1.4")
+
+    // CameraX
+    implementation ("androidx.camera:camera-camera2:1.3.2")
+    implementation ("androidx.camera:camera-lifecycle:1.3.2")
+    implementation ("androidx.camera:camera-view:1.3.2")
+
+
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
 
-    // ml kit
-    implementation ("com.google.mlkit:pose-detection-accurate:18.0.0-beta4")
 
 }
