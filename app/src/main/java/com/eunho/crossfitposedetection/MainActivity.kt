@@ -8,7 +8,6 @@ import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import com.eunho.crossfitposedetection.databinding.ActivityMainBinding
-import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.pose.PoseDetection
 import com.google.mlkit.vision.pose.PoseDetector
 import com.google.mlkit.vision.pose.defaults.PoseDetectorOptions
@@ -27,10 +26,13 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // 카메라 executor 세팅 안하면 메인 스레드 사용
         cameraExecutor = Executors.newSingleThreadExecutor()
 
+        // setting pose detector option
         val options = PoseDetectorOptions.Builder()
-            .setDetectorMode(PoseDetectorOptions.STREAM_MODE) // Real-time detection
+            // Real-time detection
+            .setDetectorMode(PoseDetectorOptions.STREAM_MODE)
             .build()
 
         poseDetector = PoseDetection.getClient(options)
@@ -48,16 +50,22 @@ class MainActivity : AppCompatActivity() {
         cameraProviderFuture.addListener({
             val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
 
-            val preview = Preview.Builder().build().also {
-                it.setSurfaceProvider(binding.previewView.surfaceProvider)
-            }
+            // 프리뷰 세팅
+            val preview = Preview
+                .Builder()
+                .build()
+                .also {
+                    it.setSurfaceProvider(binding.previewView.surfaceProvider)
+                }
 
+            // 이미지 분석
             val imageAnalysis = ImageAnalysis.Builder()
                 .build()
                 .also {
                     it.setAnalyzer(cameraExecutor, PoseAnalyzer(poseDetector))
                 }
 
+            // 카메라 앞뒤 전환
             val cameraSelector = if(isBackCamera){
                 CameraSelector.DEFAULT_BACK_CAMERA
             }else{
@@ -71,6 +79,8 @@ class MainActivity : AppCompatActivity() {
                 Log.e(TAG, "Use case binding failed", exc)
             }
         }, ContextCompat.getMainExecutor(this))
+
+
     }
 
     private fun switchCamera() {
@@ -78,30 +88,6 @@ class MainActivity : AppCompatActivity() {
         startCamera()
     }
 
-    @ExperimentalGetImage private inner class PoseAnalyzer(private val detector: PoseDetector) : ImageAnalysis.Analyzer {
-        override fun analyze(imageProxy: ImageProxy) {
-            val mediaImage = imageProxy.image
-            if (mediaImage != null) {
-                val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-
-                detector.process(inputImage)
-                    .addOnSuccessListener { pose ->
-                        val allKeypoints = pose.allPoseLandmarks
-                        for (landmark in allKeypoints) {
-                            val landmarkX = landmark.position.x
-                            val landmarkY = landmark.position.y
-                            Log.d(TAG, "Landmark X: $landmarkX, Landmark Y: $landmarkY")
-                        }
-                    }
-                    .addOnFailureListener { e ->
-                        Log.e(TAG, "Pose detection failed", e)
-                    }
-                    .addOnCompleteListener {
-                        imageProxy.close()
-                    }
-            }
-        }
-    }
 
     override fun onDestroy() {
         super.onDestroy()
