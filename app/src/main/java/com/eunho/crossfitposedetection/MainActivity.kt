@@ -60,23 +60,28 @@ class MainActivity : AppCompatActivity() {
 
             // 이미지 분석
             val imageAnalysis = ImageAnalysis.Builder()
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
                 .also {
-                    it.setAnalyzer(cameraExecutor, PoseAnalyzer(poseDetector))
+                    it.setAnalyzer(cameraExecutor, PoseAnalyzer(poseDetector, binding.videoView))
                 }
 
             // 카메라 앞뒤 전환
             val cameraSelector = if(isBackCamera){
+                Log.e(CAMERA_TAG,"camera back")
+
                 CameraSelector.DEFAULT_BACK_CAMERA
             }else{
+                Log.e(CAMERA_TAG,"camera front")
                 CameraSelector.DEFAULT_FRONT_CAMERA
             }
 
             try {
+                Log.e(CAMERA_TAG,"try camerax xxxxx")
                 cameraProvider.unbindAll()
                 cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageAnalysis)
             } catch (exc: Exception) {
-                Log.e(TAG, "Use case binding failed", exc)
+                Log.e(CAMERA_TAG, "Use case binding failed", exc)
             }
         }, ContextCompat.getMainExecutor(this))
 
@@ -94,7 +99,4 @@ class MainActivity : AppCompatActivity() {
         cameraExecutor.shutdown()
     }
 
-    companion object {
-        private const val TAG = "CameraX"
-    }
 }
