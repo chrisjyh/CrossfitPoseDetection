@@ -1,8 +1,5 @@
 package com.eunho.crossfitposedetection
 
-import android.content.ContentValues.TAG
-import android.graphics.Color
-import android.graphics.Paint
 import android.graphics.PointF
 import android.util.Log
 import android.widget.VideoView
@@ -12,98 +9,91 @@ import androidx.camera.core.ImageProxy
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.pose.PoseDetector
 import com.google.mlkit.vision.pose.PoseLandmark
-import kotlin.math.abs
-import kotlin.math.atan2
+import kotlin.math.acos
+import kotlin.math.sqrt
 
-// pose 분석
+val TAG = "test"
 @ExperimentalGetImage
 class PoseAnalyzer(
     private val detector: PoseDetector,
     private val videoView: VideoView
 ) : ImageAnalysis.Analyzer {
 
-    private val paint = Paint().apply {
-        color = Color.RED
-        style = Paint.Style.FILL
-        strokeWidth = 10f
+    private var previousState = PoseState.STANDING
+    private var squatCount = 0
+    private var lastSquatTime = 0L
+
+    // 포즈 상태
+    enum class PoseState {
+        STANDING,
+        SQUATTING
     }
 
     override fun analyze(imageProxy: ImageProxy) {
+        // 포즈 정확도
+        val accuracyThreshold = 0.9f
+        // 이미지 처리 딜레이
+        val coolDownMillis = 500L
+        // 스쿼트 각도
+        val isSquatAngle = 90
         val mediaImage = imageProxy.image
-        val accuracy = 0.9f
 
         if (mediaImage != null) {
             val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
 
-            // 포즈 좌표 인식
             detector.process(inputImage)
                 .addOnSuccessListener { pose ->
-
                     val leftHip = pose.getPoseLandmark(PoseLandmark.LEFT_HIP)
                     val leftKnee = pose.getPoseLandmark(PoseLandmark.LEFT_KNEE)
                     val leftAnkle = pose.getPoseLandmark(PoseLandmark.LEFT_ANKLE)
 
+                    // 왼쪽 다리 기준
+                    if (leftHip != null && leftKnee != null && leftAnkle != null &&
+                        leftHip.inFrameLikelihood > accuracyThreshold &&
+                        leftKnee.inFrameLikelihood > accuracyThreshold &&
+                        leftAnkle.inFrameLikelihood > accuracyThreshold) {
 
-                    if (leftHip != null && leftKnee != null && leftAnkle != null) {
-                        Log.e("accuracy", """accuracy: ${leftHip.inFrameLikelihood} """)
-                        var accuracyFrameLike = arrayOf(leftHip.inFrameLikelihood,leftKnee.inFrameLikelihood, leftAnkle.inFrameLikelihood).average()
-                        if(accuracyFrameLike > accuracy){
-                            Log.e("test",getSquatState(leftHip.position, leftKnee.position ,leftAnkle.position))
+                        // 왼쪽 다리 각도 계산
+                        val angle = calculateAngle(leftHip.position, leftKnee.position, leftAnkle.position)
+
+                        // 현재 상태
+                        val currentState = if (angle < isSquatAngle) PoseState.SQUATTING else PoseState.STANDING
+
+                        // 스쿼트 체크 후 카운트
+                        if (previousState == PoseState.STANDING && currentState == PoseState.SQUATTING &&
+                            System.currentTimeMillis() - lastSquatTime > coolDownMillis) {
+                            squatCount++
+                            lastSquatTime = System.currentTimeMillis()
+                            Log.d(TAG, "Count: $squatCount")
                         }
 
-
+                        // 스쿼트 상태 변경
+                        previousState = currentState
                     }
                 }
                 .addOnFailureListener { e ->
-                    Log.e("test", "Pose detection failed", e)
+                    Log.e(TAG, "Pose detection failed", e)
                 }
                 .addOnCompleteListener {
                     imageProxy.close()
                 }
         }
     }
-    private fun getAngle(firstPoint: PointF, midPoint: PointF, lastPoint: PointF): Double {
-        var result = Math.toDegrees(
-            atan2(lastPoint.y - midPoint.y, lastPoint.x - midPoint.x) - atan2(firstPoint.y - midPoint.y,firstPoint.x - midPoint.x).toDouble()
-        )
-        result = abs(result) // Angle should never be negative
-        if (result > 180) {
-            result = 360.0 - result // Always get the acute representation of the angle
-        }
-        return result
+
+    /**
+     * 각도 구하기
+     * */
+    private fun calculateAngle(point1: PointF, point2: PointF, point3: PointF): Double {
+        val a = distance(point2.x, point2.y, point3.x, point3.y)
+        val b = distance(point1.x, point1.y, point3.x, point3.y)
+        val c = distance(point1.x, point1.y, point2.x, point2.y)
+        return Math.toDegrees(acos((b * b + c * c - a * a) / (2 * b * c)))
     }
 
-    private fun drawPosesOnVideo(poses: MutableList<PoseLandmark>) {
-        val canvas = videoView.holder.lockCanvas()
-
-
-        val scaleFactorX = canvas.width.toFloat() / videoView.width
-        val scaleFactorY = canvas.height.toFloat() / videoView.height
-
-        for (landmark in poses) {
-            val landmarkX = scaleFactorX * landmark.position.x
-            val landmarkY = scaleFactorY * landmark.position.y
-
-            canvas.drawCircle(landmarkX, landmarkY, 8f, paint)
-        }
-
-        videoView.holder.unlockCanvasAndPost(canvas)
+    /**
+     * 지점 사이의 거리
+     * */
+    private fun distance(x1: Float, y1: Float, x2: Float, y2: Float): Double {
+        return sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1).toDouble())
     }
-
-    private fun getSquatState(hip: PointF, knee: PointF, ankle: PointF): String {
-        val angleThreshold = 100
-
-        var angle = getAngle(hip, knee, ankle)
-
-        Log.e("angle", "angle: $angle")
-
-        if ( angle < angleThreshold){
-            return "down"
-        }else{
-            return "up"
-        }
-    }
-
-
-
 }
