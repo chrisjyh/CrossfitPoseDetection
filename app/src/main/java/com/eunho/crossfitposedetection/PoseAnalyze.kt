@@ -2,7 +2,7 @@ package com.eunho.crossfitposedetection
 
 import android.graphics.PointF
 import android.util.Log
-import android.widget.VideoView
+import android.widget.TextView
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -16,12 +16,13 @@ val TAG = "test"
 @ExperimentalGetImage
 class PoseAnalyzer(
     private val detector: PoseDetector,
-    private val videoView: VideoView
+    private val squatShow: TextView
 ) : ImageAnalysis.Analyzer {
 
     private var previousState = PoseState.STANDING
     private var squatCount = 0
     private var lastSquatTime = 0L
+    private var squattingStartTime = 0L
 
     // 포즈 상태
     enum class PoseState {
@@ -31,11 +32,14 @@ class PoseAnalyzer(
 
     override fun analyze(imageProxy: ImageProxy) {
         // 포즈 정확도
-        val accuracyThreshold = 0.9f
+        val accuracyThreshold = 0.8f
         // 이미지 처리 딜레이
         val coolDownMillis = 500L
         // 스쿼트 각도
-        val isSquatAngle = 90
+        val isSquatAngle = 100
+        // 스쿼트 깊이 0.4 이하로 내려갔을 때 스쿼트로 인식
+        val squatDepthThreshold = 0.5
+
         val mediaImage = imageProxy.image
 
         if (mediaImage != null) {
@@ -59,12 +63,19 @@ class PoseAnalyzer(
                         // 현재 상태
                         val currentState = if (angle < isSquatAngle) PoseState.SQUATTING else PoseState.STANDING
 
+                        // 스쿼트 상태 변경
+                        if (currentState == PoseState.SQUATTING && previousState != PoseState.SQUATTING) {
+                            squattingStartTime = System.currentTimeMillis()
+                        }
+
                         // 스쿼트 체크 후 카운트
-                        if (previousState == PoseState.STANDING && currentState == PoseState.SQUATTING &&
-                            System.currentTimeMillis() - lastSquatTime > coolDownMillis) {
+                        if (currentState == PoseState.SQUATTING && previousState == PoseState.SQUATTING &&
+                            System.currentTimeMillis() - squattingStartTime > coolDownMillis &&
+                            leftHip.position.y - leftKnee.position.y > squatDepthThreshold) {
                             squatCount++
-                            lastSquatTime = System.currentTimeMillis()
-                            Log.d(TAG, "Count: $squatCount")
+                            Log.e(TAG, "Count: $squatCount")
+                            squatShow.text = "count - $squatCount"
+                            squattingStartTime = System.currentTimeMillis()
                         }
 
                         // 스쿼트 상태 변경

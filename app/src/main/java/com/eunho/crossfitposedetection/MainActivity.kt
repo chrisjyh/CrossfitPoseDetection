@@ -29,9 +29,7 @@ class MainActivity : AppCompatActivity() {
         // 카메라 executor 세팅 안하면 메인 스레드 사용
         cameraExecutor = Executors.newSingleThreadExecutor()
 
-        // setting pose detector option
         val options = PoseDetectorOptions.Builder()
-            // Real-time detection
             .setDetectorMode(PoseDetectorOptions.STREAM_MODE)
             .build()
 
@@ -63,7 +61,7 @@ class MainActivity : AppCompatActivity() {
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
                 .also {
-                    it.setAnalyzer(cameraExecutor, PoseAnalyzer(poseDetector, binding.videoView))
+                    it.setAnalyzer(cameraExecutor, PoseAnalyzer(poseDetector, binding.tvSquatCount))
                 }
 
             // 카메라 앞뒤 전환
